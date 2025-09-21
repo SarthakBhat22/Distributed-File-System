@@ -1,0 +1,15 @@
+namenode:
+  host: localhost
+  port: 8000
+
+datanodes:
+  - host: localhost
+    port: 8001
+  - host: localhost
+    port: 8002
+  - host: localhost
+    port: 8003
+
+replication_factor: 3
+
+block_size: 64 * 1024
