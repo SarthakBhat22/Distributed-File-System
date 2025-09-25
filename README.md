@@ -1,7 +1,7 @@
 # Yet Another Distributed File System
 Yet Another Distributed File System (or YADFS) is a distributed, scalable, fault-tolerant block type file storage system that can be used to handle multiple, large files. It can be scaled up quite easily and can handle millions of megabytes across thousands of nodes.
 
-<img width="701" height="245" alt="image" src="https://github.com/user-attachments/assets/58a4f145-221b-4446-ab26-8adf9cf6bf65" /><br>
+<img width="701" height="245" alt="image" src="https://github-production-user-asset-6210df.s3.amazonaws.com/108574841/492368119-58a4f145-221b-4446-ab26-8adf9cf6bf65.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250925%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250925T192445Z&X-Amz-Expires=300&X-Amz-Signature=e74542050c2b0e94909131a7aa6471f04b924a05036066cb24e1e2ca10a03308&X-Amz-SignedHeaders=host" /><br>
 
 This file system features a Namenode, Datanodes and the Client code. All three of these can be used on different machines as long as the IP and port of each component is known. <br>
 
