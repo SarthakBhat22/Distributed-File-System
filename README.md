@@ -1,7 +1,7 @@
 # Yet Another Distributed File System
 Yet Another Distributed File System (or YADFS) is a distributed, scalable, fault-tolerant block type file storage system that can be used to handle multiple, large files. It can be scaled up quite easily and can handle millions of megabytes across thousands of nodes.
 
-<img width="701" height="245" alt="image" src="https://github-production-user-asset-6210df.s3.amazonaws.com/108574841/492368119-58a4f145-221b-4446-ab26-8adf9cf6bf65.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250925%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250925T192445Z&X-Amz-Expires=300&X-Amz-Signature=e74542050c2b0e94909131a7aa6471f04b924a05036066cb24e1e2ca10a03308&X-Amz-SignedHeaders=host" /><br>
+<img width="818" height="230" alt="image" src="https://github.com/user-attachments/assets/a0c08841-e63d-412e-bc4d-9c7b97b2a6b5" /><br>
 
 This file system features a Namenode, Datanodes and the Client code. All three of these can be used on different machines as long as the IP and port of each component is known. <br>
 
@@ -31,3 +31,10 @@ The following process demonstrates how reads are handled for files:
 2. The Namenode returns the metadata along with the available Datanodes that contain the blocks for the file.<br><br>
 3. Client recieves this list and does a round-robin read of the Datanodes to read each block to avoid unbalanced load on some nodes. If reads from a node fail, another node with the replica is queried.<br><br>
 4. Once the blocks are recieved, they can be reconstructed on the client side and written into the local system of the user.<br><br>
+
+The best way to run this dfs is to use 3 to 7 datanodes per namenode and keep track of all namenode endpoints, that way the client code can be configured with an available node. <br>
+
+There are many operations that can performed, including directory management. The command ```help commands``` gives a more detailed explaination for each functionality. <br>Additionally, ```help <command>``` gives more details for the specific operation. Basic understanding of Linux termial commands will be helpful.<br>
+<img width="853" height="379" alt="image" src="https://github.com/user-attachments/assets/0065414c-d632-482e-823d-c535064ff649" />
+
+More information on the file system and instructions on how to run it will be available in the DFS Guide.
