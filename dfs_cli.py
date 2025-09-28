@@ -23,7 +23,7 @@ class DFSCLI(cmd.Cmd):
        | |/ ___ \| |_| |  _|  ___) |
        |_/_/   \_\____/|_|   |____/ 
                 {Fore.CYAN}
-                 v 1.25 
+                 v 1.25                     By Sarthak Bhat
 
     {Style.RESET_ALL}
     Type '{Fore.YELLOW}help{Style.RESET_ALL}' or '{Fore.YELLOW}?{Style.RESET_ALL}' to list commands
