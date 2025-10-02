@@ -16,7 +16,7 @@ Note: Make sure you have the latest versions of Python and Redis installed on yo
 
 ### Writes
 The process followed during writes is shown in this diagram:
-<img width="1117" height="650" alt="Screenshot 2025-09-10 at 11 33 36 PM" src="https://github-production-user-asset-6210df.s3.amazonaws.com/108574841/488427250-1a539423-c3a0-4716-8893-b788d85cb094.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250925%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250925T192559Z&X-Amz-Expires=300&X-Amz-Signature=7d04e94a39dca1cf442a3a0863ac6fdf30c122afb8d316217144ce8df8b56bf6&X-Amz-SignedHeaders=host" />
+<img width="1117" height="650" alt="DFS-1" src="https://github.com/user-attachments/assets/8727a49b-c446-4122-a2c5-2f1eacebcf8d" />
 <br>
 1. The Client knows which active datanodes are available since sthe Namenode keeps track with regular heartbeats.<br><br>
 2. It picks random Datanodes to write each block. Once it has successfully written the original blocks and the Datanodes send an acknowledgement for a successful write, the Datanodes asynchronously replicate each original block to match the replication factor.<br><br>
@@ -25,7 +25,7 @@ The process followed during writes is shown in this diagram:
 5. Namenode is always aware of the condition of each Datanode that had connected and registered successfully with it. After 30 seconds of inactivity, the node is considered to be dead unless it comes back up and registers again.
 ### Reads
 The following process demonstrates how reads are handled for files:
-<img width="1078" height="630" alt="Screenshot 2025-09-10 at 11 33 46 PM" src="https://private-user-images.githubusercontent.com/108574841/488428060-b1e63188-dc9f-470e-ad92-0c5039ba193f.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTk0MDEzOTQsIm5iZiI6MTc1OTQwMTA5NCwicGF0aCI6Ii8xMDg1NzQ4NDEvNDg4NDI4MDYwLWIxZTYzMTg4LWRjOWYtNDcwZS1hZDkyLTBjNTAzOWJhMTkzZi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMDAyJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTAwMlQxMDMxMzRaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jYjg1NjNlYjM4YjRjZDY1ODIyY2YwZjY0NWQwMDc2NDk3MDc5NjVkMmNjMTA3NDAxZjczNDUxMDQ5OWRiNmZlJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.DSlseL3Avk_RMwZokTsph0YC60jycUwGqubEXZQzZOY" />
+<img width="1078" height="630" alt="DFS-2" src="https://github.com/user-attachments/assets/99823987-beb7-4f83-8668-0b94f9b881da" />
 <br>
 1. The Client queries the Namenode with the file it wants to read within the file system. Reading a file not present in the dfs returns an error.<br><br>
 2. The Namenode returns the metadata along with the available Datanodes that contain the blocks for the file.<br><br>
