@@ -1,164 +1,218 @@
 #!/usr/bin/env python3
 """
-Performance monitoring script for YADFS
-Tracks key metrics and provides performance insights
+Distributed Performance monitoring script for YADFS
+Queries all DataNodes and NameNode for metrics and displays in terminal
 """
 
 import time
-import psutil
-import threading
+import socket
 import json
+import argparse
+from datetime import datetime
 
-class PerformanceMonitor:
-    def __init__(self):
-        self.metrics = {
-            'start_time': time.time(),
-            'operations': {
-                'writes': 0,
-                'reads': 0,
-                'errors': 0
-            },
-            'latency': {
-                'write_avg': 0,
-                'read_avg': 0,
-                'write_times': [],
-                'read_times': []
-            },
-            'throughput': {
-                'bytes_written': 0,
-                'bytes_read': 0,
-                'blocks_written': 0,
-                'blocks_read': 0
-            },
-            'system': {
-                'cpu_usage': [],
-                'memory_usage': [],
-                'disk_io': []
-            }
+class DistributedPerformanceMonitor:
+    def __init__(self, namenode_host, namenode_port):
+        self.namenode_host = namenode_host
+        self.namenode_port = namenode_port
+        self.monitoring_interval = 10  # seconds
+        
+        print(f"Initialized Distributed Performance Monitor")
+        print(f"NameNode: {namenode_host}:{namenode_port}")
+    
+    def get_datanodes_from_namenode(self):
+        """Query NameNode for list of active DataNodes"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5)
+                s.connect((self.namenode_host, self.namenode_port))
+                s.sendall("get_datanodes".encode())
+                response = s.recv(4096).decode()
+                
+                if response.startswith("datanodes"):
+                    nodes = response.split()[1:]
+                    return nodes
+                return []
+        except Exception as e:
+            print(f"Error querying NameNode for DataNodes: {e}")
+            return []
+    
+    def query_datanode_metrics(self, datanode_addr):
+        """Query a specific DataNode for its metrics"""
+        try:
+            host, port = datanode_addr.split(':')
+            port = int(port)
+            
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5)
+                s.connect((host, port))
+                
+                # Send using length-prefixed format (same as DataNode expects)
+                message = "get_metrics"
+                data = message.encode()
+                length = len(data).to_bytes(4, 'big')
+                s.sendall(length + data)
+                
+                # Receive response (plain JSON, not length-prefixed)
+                response = s.recv(8192).decode()
+                metrics = json.loads(response)
+                return metrics
+                
+        except Exception as e:
+            print(f"Error querying DataNode {datanode_addr}: {e}")
+            return None
+    
+    def query_namenode_metrics(self):
+        """Query NameNode for its metrics"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5)
+                s.connect((self.namenode_host, self.namenode_port))
+                
+                # NameNode uses plain strings (no length prefix)
+                s.sendall("get_metrics".encode())
+                
+                response = s.recv(8192).decode()
+                metrics = json.loads(response)
+                return metrics
+                
+        except Exception as e:
+            print(f"Error querying NameNode: {e}")
+            return None
+    
+    def collect_all_metrics(self):
+        """Collect metrics from all nodes in the cluster"""
+        datanodes = self.get_datanodes_from_namenode()
+        
+        datanode_metrics = {}
+        for dn in datanodes:
+            metrics = self.query_datanode_metrics(dn)
+            if metrics:
+                datanode_metrics[dn] = metrics
+        
+        namenode_metrics = self.query_namenode_metrics()
+        cluster_metrics = self.calculate_cluster_metrics(datanode_metrics, namenode_metrics)
+        
+        return {
+            'timestamp': time.time(),
+            'datanodes': datanode_metrics,
+            'namenode': namenode_metrics or {},
+            'cluster': cluster_metrics
         }
-        self.lock = threading.Lock()
+    
+    def calculate_cluster_metrics(self, datanode_metrics, namenode_metrics):
+        """Calculate aggregate cluster metrics"""
+        cluster = {
+            'total_datanodes': len(datanode_metrics),
+            'total_blocks_written': 0,
+            'total_blocks_read': 0,
+            'total_bytes_written': 0,
+            'total_bytes_read': 0,
+            'avg_write_latency_ms': 0,
+            'avg_read_latency_ms': 0,
+            'total_errors': 0,
+            'cluster_uptime': 0
+        }
         
-    def record_operation(self, op_type, duration, bytes_transferred=0):
-        """Record operation metrics"""
-        with self.lock:
-            self.metrics['operations'][op_type] += 1
-            
-            if op_type == 'writes':
-                self.metrics['latency']['write_times'].append(duration)
-                self.metrics['throughput']['bytes_written'] += bytes_transferred
-                self.metrics['throughput']['blocks_written'] += 1
-            elif op_type == 'reads':
-                self.metrics['latency']['read_times'].append(duration)
-                self.metrics['throughput']['bytes_read'] += bytes_transferred
-                self.metrics['throughput']['blocks_read'] += 1
-            
-            # Keep only last 1000 measurements
-            if len(self.metrics['latency']['write_times']) > 1000:
-                self.metrics['latency']['write_times'] = self.metrics['latency']['write_times'][-1000:]
-            if len(self.metrics['latency']['read_times']) > 1000:
-                self.metrics['latency']['read_times'] = self.metrics['latency']['read_times'][-1000:]
-    
-    def record_error(self):
-        """Record error occurrence"""
-        with self.lock:
-            self.metrics['operations']['errors'] += 1
-    
-    def get_performance_summary(self):
-        """Get current performance summary"""
-        with self.lock:
-            uptime = time.time() - self.metrics['start_time']
-            
-            # Calculate averages
-            write_times = self.metrics['latency']['write_times']
-            read_times = self.metrics['latency']['read_times']
-            
-            write_avg = sum(write_times) / len(write_times) if write_times else 0
-            read_avg = sum(read_times) / len(read_times) if read_times else 0
-            
-            # Calculate throughput
-            write_throughput = self.metrics['throughput']['bytes_written'] / uptime if uptime > 0 else 0
-            read_throughput = self.metrics['throughput']['bytes_read'] / uptime if uptime > 0 else 0
-            
-            return {
-                'uptime_seconds': uptime,
-                'total_operations': sum(self.metrics['operations'].values()),
-                'write_operations': self.metrics['operations']['writes'],
-                'read_operations': self.metrics['operations']['reads'],
-                'error_rate': self.metrics['operations']['errors'] / max(sum(self.metrics['operations'].values()), 1),
-                'avg_write_latency_ms': write_avg * 1000,
-                'avg_read_latency_ms': read_avg * 1000,
-                'write_throughput_mbps': write_throughput / (1024 * 1024),
-                'read_throughput_mbps': read_throughput / (1024 * 1024),
-                'blocks_written': self.metrics['throughput']['blocks_written'],
-                'blocks_read': self.metrics['throughput']['blocks_read']
-            }
-    
-    def start_system_monitoring(self):
-        """Start background system monitoring"""
-        def monitor_system():
-            while True:
-                try:
-                    cpu_percent = psutil.cpu_percent(interval=1)
-                    memory = psutil.virtual_memory()
-                    disk_io = psutil.disk_io_counters()
-                    
-                    with self.lock:
-                        self.metrics['system']['cpu_usage'].append(cpu_percent)
-                        self.metrics['system']['memory_usage'].append(memory.percent)
-                        self.metrics['system']['disk_io'].append({
-                            'read_bytes': disk_io.read_bytes if disk_io else 0,
-                            'write_bytes': disk_io.write_bytes if disk_io else 0
-                        })
-                        
-                        # Keep only last 100 measurements
-                        for key in ['cpu_usage', 'memory_usage', 'disk_io']:
-                            if len(self.metrics['system'][key]) > 100:
-                                self.metrics['system'][key] = self.metrics['system'][key][-100:]
-                    
-                    time.sleep(5)
-                except Exception as e:
-                    print(f"System monitoring error: {e}")
-                    time.sleep(5)
+        write_latencies = []
+        read_latencies = []
         
-        thread = threading.Thread(target=monitor_system, daemon=True)
-        thread.start()
-    
-    def print_performance_report(self):
-        """Print current performance report"""
-        summary = self.get_performance_summary()
+        for dn_addr, metrics in datanode_metrics.items():
+            cluster['total_blocks_written'] += metrics.get('blocks_written', 0)
+            cluster['total_blocks_read'] += metrics.get('blocks_read', 0)
+            cluster['total_bytes_written'] += metrics.get('bytes_written', 0)
+            cluster['total_bytes_read'] += metrics.get('bytes_read', 0)
+            cluster['total_errors'] += metrics.get('errors', 0)
+            
+            if metrics.get('avg_write_latency_ms', 0) > 0:
+                write_latencies.append(metrics['avg_write_latency_ms'])
+            if metrics.get('avg_read_latency_ms', 0) > 0:
+                read_latencies.append(metrics['avg_read_latency_ms'])
         
-        print("\n" + "="*50)
-        print("YADFS PERFORMANCE REPORT")
-        print("="*50)
-        print(f"Uptime: {summary['uptime_seconds']:.1f} seconds")
-        print(f"Total Operations: {summary['total_operations']}")
-        print(f"Write Operations: {summary['write_operations']}")
-        print(f"Read Operations: {summary['read_operations']}")
-        print(f"Error Rate: {summary['error_rate']:.2%}")
-        print(f"Average Write Latency: {summary['avg_write_latency_ms']:.2f} ms")
-        print(f"Average Read Latency: {summary['avg_read_latency_ms']:.2f} ms")
-        print(f"Write Throughput: {summary['write_throughput_mbps']:.2f} MB/s")
-        print(f"Read Throughput: {summary['read_throughput_mbps']:.2f} MB/s")
-        print(f"Blocks Written: {summary['blocks_written']}")
-        print(f"Blocks Read: {summary['blocks_read']}")
-        print("="*50)
+        if write_latencies:
+            cluster['avg_write_latency_ms'] = sum(write_latencies) / len(write_latencies)
+        if read_latencies:
+            cluster['avg_read_latency_ms'] = sum(read_latencies) / len(read_latencies)
+        
+        if namenode_metrics:
+            cluster['total_files'] = namenode_metrics.get('total_files', 0)
+            cluster['cluster_uptime'] = namenode_metrics.get('uptime', 0)
+        
+        if cluster.get('cluster_uptime', 0) > 0:
+            cluster['write_throughput_mbps'] = (cluster['total_bytes_written'] / cluster['cluster_uptime']) / (1024 * 1024)
+            cluster['read_throughput_mbps'] = (cluster['total_bytes_read'] / cluster['cluster_uptime']) / (1024 * 1024)
+        else:
+            cluster['write_throughput_mbps'] = 0
+            cluster['read_throughput_mbps'] = 0
+        
+        return cluster
+    
+    def print_metrics_report(self, metrics):
+        """Print a formatted metrics report to console"""
+        print("\n" + "="*70)
+        print(f"YADFS CLUSTER PERFORMANCE REPORT - {datetime.fromtimestamp(metrics['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}")
+        print("="*70)
+        
+        cluster = metrics['cluster']
+        print("\nCLUSTER OVERVIEW:")
+        print(f"  Active DataNodes: {cluster['total_datanodes']}")
+        if 'total_files' in cluster:
+            print(f"  Total Files: {cluster['total_files']}")
+        print(f"  Cluster Uptime: {cluster['cluster_uptime']:.1f}s")
+        
+        print("\nOPERATIONS:")
+        print(f"  Total Blocks Written: {cluster['total_blocks_written']}")
+        print(f"  Total Blocks Read: {cluster['total_blocks_read']}")
+        print(f"  Total Errors: {cluster['total_errors']}")
+        
+        print("\nPERFORMANCE:")
+        print(f"  Avg Write Latency: {cluster['avg_write_latency_ms']:.2f} ms")
+        print(f"  Avg Read Latency: {cluster['avg_read_latency_ms']:.2f} ms")
+        print(f"  Write Throughput: {cluster['write_throughput_mbps']:.2f} MB/s")
+        print(f"  Read Throughput: {cluster['read_throughput_mbps']:.2f} MB/s")
+        
+        if metrics['datanodes']:
+            print("\nDATANODE DETAILS:")
+            for dn_addr, dn_metrics in sorted(metrics['datanodes'].items()):
+                print(f"\n  DataNode: {dn_addr}")
+                print(f"    Uptime: {dn_metrics.get('uptime', 0):.1f}s")
+                print(f"    Blocks Written: {dn_metrics.get('blocks_written', 0)}")
+                print(f"    Blocks Read: {dn_metrics.get('blocks_read', 0)}")
+                print(f"    Write Latency: {dn_metrics.get('avg_write_latency_ms', 0):.2f} ms")
+                print(f"    Read Latency: {dn_metrics.get('avg_read_latency_ms', 0):.2f} ms")
+                print(f"    Errors: {dn_metrics.get('errors', 0)}")
+        
+        print("\n" + "="*70 + "\n")
+    
+    def start(self):
+        """Start the monitoring service"""
+        print("Starting Distributed Performance Monitor...\n")
+        
+        while True:
+            try:
+                metrics = self.collect_all_metrics()
+                self.print_metrics_report(metrics)
+            except Exception as e:
+                print(f"Error in monitoring loop: {e}")
+            
+            time.sleep(self.monitoring_interval)
 
-# Global monitor instance
-monitor = PerformanceMonitor()
-
-def record_operation(op_type, duration, bytes_transferred=0):
-    """Global function to record operations"""
-    monitor.record_operation(op_type, duration, bytes_transferred)
-
-def record_error():
-    """Global function to record errors"""
-    monitor.record_error()
 
 if __name__ == "__main__":
-    # Start system monitoring
-    monitor.start_system_monitoring()
+    parser = argparse.ArgumentParser(description="YADFS Distributed Performance Monitor")
+    parser.add_argument("--namenode-host", default="localhost", help="NameNode host")
+    parser.add_argument("--namenode-port", type=int, default=8000, help="NameNode port")
+    parser.add_argument("--interval", type=int, default=10, help="Monitoring interval in seconds")
     
-    # Print periodic reports
-    while True:
-        time.sleep(30)
-        monitor.print_performance_report() 
+    args = parser.parse_args()
+    
+    monitor = DistributedPerformanceMonitor(
+        namenode_host=args.namenode_host,
+        namenode_port=args.namenode_port
+    )
+    
+    monitor.monitoring_interval = args.interval
+    
+    try:
+        monitor.start()
+    except KeyboardInterrupt:
+        print("\nShutting down Performance Monitor...")

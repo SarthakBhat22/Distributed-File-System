@@ -1,69 +1,84 @@
 #!/bin/bash
-# start_dfs.sh
 
-echo "Starting DFS components..."
+# YADFS Cluster Launcher Script
+# This script launches all components in separate terminal windows
 
-# Start Redis in background
-echo "Starting Redis..."
-redis-server &
-REDIS_PID=$!
-sleep 2
+echo "Starting YADFS Cluster..."
 
-# Start NameNode in background
-echo "Starting NameNode..."
-python3 name1.py &
-NAMENODE_PID=$!
-sleep 2
-
-# Start DataNodes in background
-echo "Starting DataNodes..."
-python3 data1.py -p 8001 &
-DN1_PID=$!
-python3 data1.py -p 8002 &
-DN2_PID=$!
-python3 data1.py -p 8003 &
-DN3_PID=$!
-
-sleep 3
-echo "All components started. Starting CLI..."
-
-# Start CLI in foreground
-python3 dfs_cli.py
-
-# When CLI exits, kill background processes
-echo "Shutting down DFS..."
-kill $REDIS_PID $NAMENODE_PID $DN1_PID $DN2_PID $DN3_PID 2>/dev/null
-echo "DFS shutdown complete"
-
-# ----------------------------------------
-
-#!/bin/bash
-# start_dfs_tmux.sh - Using tmux (better for development)
-
-# Check if tmux is available
-if ! command -v tmux &> /dev/null; then
-    echo "tmux is not installed. Please install it first:"
-    echo "  macOS: brew install tmux"
-    echo "  Ubuntu: sudo apt install tmux"
+# Detect the terminal emulator
+if command -v gnome-terminal &> /dev/null; then
+    TERMINAL="gnome-terminal"
+    TERM_CMD="--"
+elif command -v konsole &> /dev/null; then
+    TERMINAL="konsole"
+    TERM_CMD="-e"
+elif command -v xterm &> /dev/null; then
+    TERMINAL="xterm"
+    TERM_CMD="-e"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    TERMINAL="osascript"
+else
+    echo "No supported terminal found. Please install gnome-terminal, konsole, or xterm."
     exit 1
 fi
 
-SESSION_NAME="dfs"
+# Function to launch command in new terminal
+launch_terminal() {
+    local title=$1
+    local command=$2
+    
+    if [[ "$TERMINAL" == "gnome-terminal" ]]; then
+        gnome-terminal --title="$title" -- bash -c "$command; exec bash"
+    elif [[ "$TERMINAL" == "konsole" ]]; then
+        konsole --title "$title" -e bash -c "$command; exec bash" &
+    elif [[ "$TERMINAL" == "xterm" ]]; then
+        xterm -title "$title" -e bash -c "$command; exec bash" &
+    elif [[ "$TERMINAL" == "osascript" ]]; then
+        osascript -e "tell app \"Terminal\" to do script \"cd $(pwd) && $command\""
+    fi
+    
+    sleep 0.5
+}
 
-# Kill existing session if it exists
-tmux kill-session -t $SESSION_NAME 2>/dev/null
+# Check if Redis is already running
+if ! pgrep -x "redis-server" > /dev/null; then
+    echo "Starting Redis Server..."
+    launch_terminal "Redis Server" "redis-server"
+    sleep 2
+else
+    echo "Redis is already running"
+fi
 
-# Create new session and windows
-tmux new-session -d -s $SESSION_NAME -n redis 'redis-server'
-tmux new-window -t $SESSION_NAME -n namenode 'python3 name1.py'
-tmux new-window -t $SESSION_NAME -n datanode1 'python3 data1.py -p 8001'
-tmux new-window -t $SESSION_NAME -n datanode2 'python3 data1.py -p 8002'
-tmux new-window -t $SESSION_NAME -n datanode3 'python3 data1.py -p 8003'
-tmux new-window -t $SESSION_NAME -n cli 'sleep 5 && python3 dfs_cli.py'
+# Start NameNode
+echo "Starting NameNode..."
+launch_terminal "NameNode" "python3 namenode.py"
+sleep 2
 
-echo "DFS started in tmux session '$SESSION_NAME'"
-echo "To attach: tmux attach -t $SESSION_NAME"
-echo "To kill all: tmux kill-session -t $SESSION_NAME"
+# Start DataNodes
+echo "Starting DataNode 8001..."
+launch_terminal "DataNode 8001" "python3 datanode.py -p 8001"
+sleep 1
 
-# Optionally attach immediately
-# tmux attach -t $SESSION_NAME
+echo "Starting DataNode 8002..."
+launch_terminal "DataNode 8002" "python3 datanode.py -p 8002"
+sleep 1
+
+echo "Starting DataNode 8003..."
+launch_terminal "DataNode 8003" "python3 datanode.py -p 8003"
+sleep 1
+
+# Start Performance Monitor (optional)
+echo "Starting Performance Monitor..."
+launch_terminal "Performance Monitor" "python3 performance_monitor.py --interval 10"
+sleep 1
+
+# Start CLI
+echo "Starting DFS CLI..."
+launch_terminal "DFS CLI" "python3 dfs_cli.py"
+
+echo ""
+echo "YADFS Cluster started successfully!"
+echo "All components are running in separate terminal windows."
+echo ""
+echo "To stop all components, run: ./stop_yadfs.sh"

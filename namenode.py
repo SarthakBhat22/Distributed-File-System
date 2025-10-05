@@ -18,6 +18,7 @@ class NameNode:
         self.heartbeat_timeout = 30
         self.last_status_print = datetime.now()
         self.status_print_interval = 10
+        self.start_time = time.time()
         
         self.metadata_cache = OrderedDict()
         self.max_cache_size = 1000
@@ -651,6 +652,9 @@ class NameNode:
                         response = f"delete_directory_result error {result}"
                 else:
                     response = "delete_directory_result error insufficient parameters"
+            elif message == "get_metrics":
+                self.handle_get_metrics(datanode_socket)
+                return
             else:
                 response = "Invalid message"
 
@@ -674,6 +678,52 @@ class NameNode:
                 print(f"Heartbeat from unregistered DataNode {datanode_addr}")
         if datanode_addr not in self.datanodes:
             self.register_datanode(datanode_addr)
+
+    def get_metrics(self):
+        """Return current NameNode metrics"""
+        try:
+            uptime = time.time() - self.start_time
+            
+            # Count total files
+            total_files = len(self.redis_client.hkeys('files'))
+            
+            # Count total blocks
+            total_blocks = 0
+            for file_key in self.redis_client.hkeys('files'):
+                metadata_json = self.redis_client.hget('files', file_key)
+                if metadata_json:
+                    metadata = json.loads(metadata_json)
+                    total_blocks += len(metadata.get('blocks', []))
+            
+            with self.datanodes_lock:
+                active_datanodes = len(self.datanodes)
+            
+            return {
+                'namenode': f"{self.host}:{self.port}",
+                'uptime': uptime,
+                'total_files': total_files,
+                'total_blocks': total_blocks,
+                'active_datanodes': active_datanodes,
+            }
+        except Exception as e:
+            print(f"Error getting metrics: {e}")
+            return {
+                'namenode': f"{self.host}:{self.port}",
+                'uptime': time.time() - self.start_time,
+                'total_files': 0,
+                'total_blocks': 0,
+                'active_datanodes': 0,
+            }
+
+    def handle_get_metrics(self, datanode_socket):
+        """Handle metrics request from performance monitor"""
+        try:
+            metrics = self.get_metrics()
+            metrics_json = json.dumps(metrics)
+            datanode_socket.sendall(metrics_json.encode())
+            print(f"Sent metrics to performance monitor")
+        except Exception as e:
+            print(f"Error sending metrics: {e}")
 
     def monitor_heartbeats(self):
         while True:

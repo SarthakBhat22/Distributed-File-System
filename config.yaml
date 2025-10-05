@@ -12,4 +12,4 @@ datanodes:
 
 replication_factor: 3
 
-block_size: 64 * 1024
+block_size: 65536

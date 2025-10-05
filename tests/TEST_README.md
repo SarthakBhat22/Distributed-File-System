@@ -53,14 +53,32 @@ python basic_test.py
 Basic DFS Test with Cleanup
 ===================================
 1. Testing NameNode connection...
-   ✓ NameNode connected
+   NameNode connected
 2. Testing directory creation...
-   ✓ Nested directories created
-...
-9. Verifying complete cleanup...
-   ✓ DFS returned to initial clean state
+   Nested directories created
+3. Testing directory navigation...
+   Directory navigation works
+4. Testing file upload in multiple directories...
+   Files uploaded to multiple directories
+5. Testing directory listing...
+   Directory listing shows expected contents
+6. Testing file download and integrity...
+   Files downloaded successfully
+   File integrity verified for both files
+
+All functionality tests passed!
+
+===================================
+CLEANUP PHASE - Returning DFS to initial state
+===================================
+7. Testing file deletion...
+   Files deleted successfully
+8. Testing directory deletion...
+   Directory and all contents deleted
+
+Local temp files cleaned up: 4 files
 
 All tests passed! DFS is working correctly and returned to initial state.
 ```
 
-Takes about 15-20 seconds to run. If successful, your DFS will be completely clean with no test artifacts remaining.
+You can verify all components are working. If some parts are failing, the logs can be used to debug the issue.

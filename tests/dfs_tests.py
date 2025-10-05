@@ -35,9 +35,9 @@ def test_basic_functionality():
         client = Client()
         contents = client.list_directory("/")
         if contents is not None:
-            print("   ✓ NameNode connected")
+            print("NameNode connected")
         else:
-            print("   ✗ NameNode connection failed")
+            print("NameNode connection failed")
             return False
         
         # Test 2: Create nested directories
@@ -45,18 +45,18 @@ def test_basic_functionality():
         success1 = client.create_directory("/test_basic")
         success2 = client.create_directory("/test_basic/subdir")
         if success1 and success2:
-            print("   ✓ Nested directories created")
+            print("Nested directories created")
         else:
-            print("   ✗ Directory creation failed")
+            print("Directory creation failed")
         
         # Test 3: Directory navigation
         print("3. Testing directory navigation...")
         nav_success = client.change_directory("/test_basic/subdir")
         current_dir = client.get_current_directory()
         if nav_success and current_dir == "/test_basic/subdir":
-            print("   ✓ Directory navigation works")
+            print("Directory navigation works")
         else:
-            print("   ✗ Directory navigation failed")
+            print("Directory navigation failed")
             return False
         
         # Test 4: Upload files in different directories
@@ -83,9 +83,9 @@ def test_basic_functionality():
         success2 = client.write_file(temp_file2.name, "sub_test.txt")
         
         if success1 and success2:
-            print("   ✓ Files uploaded to multiple directories")
+            print("Files uploaded to multiple directories")
         else:
-            print("   ✗ File upload failed")
+            print("File upload failed")
             return False
         
         # Test 5: List directory contents
@@ -94,9 +94,9 @@ def test_basic_functionality():
         contents = client.list_directory()
         
         if contents and len(contents) >= 2:
-            print("   ✓ Directory listing shows expected contents")
+            print("Directory listing shows expected contents")
         else:
-            print("   ✗ Directory listing failed")
+            print("Directory listing failed")
             return False
         
         # Test 6: Download and verify files
@@ -115,9 +115,9 @@ def test_basic_functionality():
         success2 = client.read_file("sub_test.txt", download_path2)
         
         if success1 and success2:
-            print("   ✓ Files downloaded successfully")
+            print("Files downloaded successfully")
         else:
-            print("   ✗ File download failed")
+            print("File download failed")
             return False
         
         with open(download_path1, 'r') as f:
@@ -126,9 +126,9 @@ def test_basic_functionality():
             downloaded_content2 = f.read()
         
         if downloaded_content1 == test_content1 and downloaded_content2 == test_content2:
-            print("   ✓ File integrity verified for both files")
+            print("File integrity verified for both files")
         else:
-            print("   ✗ File integrity check failed")
+            print("File integrity check failed")
             return False
         
         print("\nAll functionality tests passed!")
@@ -152,9 +152,9 @@ def test_basic_functionality():
         delete_success2 = client.delete_file("sub_test.txt")
         
         if delete_success1 and delete_success2:
-            print("   ✓ Files deleted successfully")
+            print("Files deleted successfully")
         else:
-            print("   ✗ File deletion failed")
+            print("File deletion failed")
         
         # Test 8: Directory deletion
         print("8. Testing directory deletion...")
@@ -164,9 +164,9 @@ def test_basic_functionality():
         delete_success = client.delete_directory("/test_basic")
         
         if delete_success:
-            print("   ✓ Directory and all contents deleted")
+            print("Directory and all contents deleted")
         else:
-            print("   ✗ Directory deletion failed")
+            print("Directory deletion failed")
         
         
         builtins.input = original_input
@@ -182,7 +182,7 @@ def test_basic_functionality():
         return True
         
     except Exception as e:
-        print(f"   ✗ Test failed with error: {e}")
+        print(f"Test failed with error: {e}")
         
         builtins.input = original_input
         for temp_file_path in temp_files:

@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 import os
+import json
 import argparse
 import random
 
@@ -19,6 +20,11 @@ class DataNode:
         self.blocks_written = 0
         self.blocks_read = 0
         self.start_time = time.time()
+        self.bytes_written = 0
+        self.bytes_read = 0
+        self.write_latencies = []
+        self.read_latencies = []
+        self.errors = 0
 
         self.peer_datanodes_lock = threading.Lock()
         self.metrics_lock = threading.Lock()
@@ -99,11 +105,15 @@ class DataNode:
                 self.handle_read_block(client_socket, metadata)
             elif command == "delete_block":
                 self.handle_delete_block(client_socket, metadata)
+            elif command == "get_metrics":
+                self.handle_get_metrics(client_socket)
             else:
                 print(f"Unknown command: {command}")
 
         except Exception as e:
             print(f"Error handling connection from {addr}: {e}")
+            with self.metrics_lock:
+                self.errors += 1 
         finally:
             try:
                 client_socket.close()
@@ -146,8 +156,14 @@ class DataNode:
             
             self.send_message(client_socket, block_data)
             
+            read_time = time.time() - start_time
+
             with self.metrics_lock:
                 self.blocks_read += 1
+                self.bytes_read += len(block_data)
+                self.read_latencies.append(read_time)
+                if len(self.read_latencies) > 1000:
+                    self.read_latencies = self.read_latencies[-1000:]
             
             read_time = time.time() - start_time
             print(f"Successfully sent block {block_id} of {storage_name} in {read_time:.3f}s")
@@ -181,11 +197,14 @@ class DataNode:
                 self.send_message(client_socket, f"error: write failed - {str(e)}")
                 return
 
-            # Update metrics with thread safety
+            write_time = time.time() - start_time
+
             with self.metrics_lock:
                 self.blocks_written += 1
-            
-            write_time = time.time() - start_time
+                self.bytes_written += len(block_data)
+                self.write_latencies.append(write_time)
+                if len(self.write_latencies) > 1000:
+                    self.write_latencies = self.write_latencies[-1000:]
             
             # Send success response to client
             self.send_message(client_socket, "success")
@@ -420,6 +439,36 @@ class DataNode:
         except Exception as e:
             print(f"Error getting available DataNodes: {e}")
             return set()
+    def get_metrics(self):
+        """Return current metrics as a dictionary"""
+        with self.metrics_lock:
+            uptime = time.time() - self.start_time
+            
+            avg_write_latency = (sum(self.write_latencies) / len(self.write_latencies) * 1000) if self.write_latencies else 0
+            avg_read_latency = (sum(self.read_latencies) / len(self.read_latencies) * 1000) if self.read_latencies else 0
+            
+            return {
+                'datanode': f"{self.host}:{self.port}",
+                'uptime': uptime,
+                'blocks_written': self.blocks_written,
+                'blocks_read': self.blocks_read,
+                'bytes_written': self.bytes_written,
+                'bytes_read': self.bytes_read,
+                'avg_write_latency_ms': avg_write_latency,
+                'avg_read_latency_ms': avg_read_latency,
+                'errors': self.errors,
+                'write_throughput_mbps': (self.bytes_written / uptime) / (1024 * 1024) if uptime > 0 else 0,
+                'read_throughput_mbps': (self.bytes_read / uptime) / (1024 * 1024) if uptime > 0 else 0
+            }
+
+    def handle_get_metrics(self, client_socket):
+        """Handle metrics request from performance monitor"""
+        try:
+            metrics = self.get_metrics()
+            metrics_json = json.dumps(metrics)
+            client_socket.sendall(metrics_json.encode())
+        except Exception as e:
+            print(f"Error sending metrics: {e}")
 
     def send_heartbeat(self):
         """Send periodic heartbeat signals with retry logic"""

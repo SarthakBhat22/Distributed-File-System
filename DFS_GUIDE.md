@@ -3,7 +3,7 @@
 ## Quick Start
 
 ### Option 1: Manual Start
-The easiest way to start the dfs would be to manually run each command in a terminal. This method also requires the user to make any changes to the endpoints directlty in the code.
+The most straight forward way to start the dfs would be to manually run each command in a terminal. The endpoints can be changed by the user manually if needed.
 1. **Start NameNode** (Terminal 1):
    ```bash
    python name1.py
@@ -27,10 +27,15 @@ The easiest way to start the dfs would be to manually run each command in a term
    ```
 
 ### Option 2: Auto Start
+This method involves using one command that spins up different terminals if you wish to start all components quickly on your system.<br><br>
+There are two files, the first one being a python script, and the second one being a shell script. Any changes can be done in the config.yaml file.
 ```bash
 python start_dfs.py
 ```
-
+```bash
+chmod +x dfs.sh
+./dfs.sh
+```
 ## Expected Output
 
 ### NameNode should show:
